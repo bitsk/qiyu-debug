@@ -1,0 +1,30 @@
+[Unit]
+Description=MIX real KMS H.264 WebRTC viewer
+After=network.target a081-remote-view.service
+PartOf=a081-remote-view.service
+
+[Service]
+Type=simple
+EnvironmentFile=/var/lib/mix-remote-video/service.env
+Environment=LD_LIBRARY_PATH=/opt/mix-remote-video/lib
+Environment=GST_PLUGIN_PATH_1_0=/opt/mix-remote-video/lib/gstreamer-1.0
+Environment=GST_REGISTRY=/run/mix-remote-video/gst-registry.bin
+ExecStartPre=/usr/bin/rm -f /run/mix-remote-video/gst-registry.bin
+ExecStart=/opt/mix-remote-video/mix-video-server --address ${MIX_VIDEO_ADDRESS} --port 8091 --token-file ${MIX_VIDEO_TOKEN_FILE}
+RuntimeDirectory=mix-remote-video mix-video-control
+RuntimeDirectoryPreserve=yes
+RuntimeDirectoryMode=0700
+KillMode=control-group
+TimeoutStopSec=12
+Restart=on-failure
+RestartSec=2
+UMask=0077
+NoNewPrivileges=yes
+ProtectHome=yes
+ProtectSystem=strict
+PrivateTmp=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_SYS_PTRACE CAP_SYS_ADMIN
+
+[Install]
+WantedBy=a081-remote-view.service

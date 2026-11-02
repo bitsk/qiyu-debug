@@ -1,0 +1,41 @@
+#version 450
+// Read the verified LINEAR KMS allocation as packed pixels, preserving its
+// actual row pitch/offset. Each invocation owns four columns by two rows, so
+// packed Y and interleaved UV stores never race with another invocation.
+layout(local_size_x=16, local_size_y=8) in;
+layout(set=0,binding=0,std430) readonly buffer Scanout { uint pixels[]; } src;
+layout(set=0,binding=1,std430) writeonly buffer NV12 { uint pixels[]; } dst;
+layout(push_constant) uniform Params {
+    uint width, height, pitch_words, offset_words, stereo, rgb10, eye, stride, uv_offset;
+} p;
+
+ivec3 rgb(uint x,uint y) {
+    uint sx=1919-y*1920/p.height;
+    uint half_width=p.width/2;
+    uint sy=p.eye!=0 ? (p.eye-1)*1832+x*1832/p.width : p.stereo!=0 ? (x/half_width)*1832+(x%half_width)*1832/half_width : x*3664/p.width;
+    uint v=src.pixels[p.offset_words+sy*p.pitch_words+sx];
+    if(p.rgb10!=0)
+        return ivec3(int(((v>>20)&1023)*255+511)/1023,
+                     int(((v>>10)&1023)*255+511)/1023,
+                     int((v&1023)*255+511)/1023);
+    return ivec3(int((v>>16)&255),int((v>>8)&255),int(v&255));
+}
+uint luma(ivec3 c) { return uint(clamp((66*c.r+129*c.g+25*c.b+4224)>>8,0,255)); }
+uvec2 chroma(ivec3 a,ivec3 b,ivec3 c,ivec3 d) {
+    ivec3 m=(a+b+c+d+ivec3(2))>>2;
+    return uvec2(clamp((-38*m.r-74*m.g+112*m.b+32896)>>8,0,255),
+                 clamp((112*m.r-94*m.g-18*m.b+32896)>>8,0,255));
+}
+uint pack4(uint a,uint b,uint c,uint d) { return a|(b<<8)|(c<<16)|(d<<24); }
+void main() {
+    // Scanout is rotated: adjacent X lanes should read adjacent source columns,
+    // rather than different source rows separated by the framebuffer pitch.
+    uint x=gl_GlobalInvocationID.y*4,y=gl_GlobalInvocationID.x*2;
+    if(x>=p.width || y>=p.height) return;
+    ivec3 a=rgb(x,y),b=rgb(x+1,y),c=rgb(x+2,y),d=rgb(x+3,y);
+    ivec3 e=rgb(x,y+1),f=rgb(x+1,y+1),g=rgb(x+2,y+1),h=rgb(x+3,y+1);
+    dst.pixels[(y*p.stride+x)/4]=pack4(luma(a),luma(b),luma(c),luma(d));
+    dst.pixels[((y+1)*p.stride+x)/4]=pack4(luma(e),luma(f),luma(g),luma(h));
+    uvec2 uv0=chroma(a,b,e,f),uv1=chroma(c,d,g,h);
+    dst.pixels[p.uv_offset/4+(y/2*p.stride+x)/4]=pack4(uv0.x,uv0.y,uv1.x,uv1.y);
+}

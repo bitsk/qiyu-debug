@@ -1,0 +1,651 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>MIX · Spatial OS 调试台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-view="all">
+<a class="skip-link" href="#workspace">跳到调试工作区</a>
+
+<!-- 背景环境氛围光晕 -->
+<div class="ambient-backdrop" aria-hidden="true">
+  <div class="ambient-orb orb-1"></div>
+  <div class="ambient-orb orb-2"></div>
+  <div class="ambient-orb orb-3"></div>
+</div>
+
+<!-- 左侧悬浮玻璃侧栏 (Spatial Floating Dock) -->
+<nav class="rail" aria-label="工作区导航">
+  <a class="rail-brand" href="#workspace">
+    <span class="brand-mark">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17V7l8 5 8-5v10"/><path d="M12 12v9"/><path d="M20 7l-8-4-8 4"/></svg>
+    </span>
+    <div class="brand-text">MIX STUDIO<small>SPATIAL TELEMETRY</small></div>
+  </a>
+
+  <div class="rail-group">
+    <div class="rail-label">WORKSPACE</div>
+    <a href="#workspace" class="nav-link nav-view active" data-view-target="all" title="全景工作台 (快捷键 1)">
+      <span class="nav-icon"><svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="2.5" y="2.5" width="6.2" height="6.2" rx="1.8"/><rect x="11.3" y="2.5" width="6.2" height="6.2" rx="1.8"/><rect x="2.5" y="11.3" width="6.2" height="6.2" rx="1.8"/><rect x="11.3" y="11.3" width="6.2" height="6.2" rx="1.8"/></svg></span>
+      <span>全景工作台</span><kbd>1</kbd>
+    </a>
+    <a href="#video-panel" class="nav-link nav-view" data-view-target="visual" title="视觉与光学相机 (快捷键 2)">
+      <span class="nav-icon"><svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="2" y="4.5" width="16" height="11" rx="2.5"/><circle cx="7" cy="10" r="2"/><circle cx="13" cy="10" r="2"/></svg></span>
+      <span>视觉与相机</span><kbd>2</kbd>
+    </a>
+    <a href="#tracking-panel" class="nav-link nav-view" data-view-target="spatial" title="6DoF 空间与外设 (快捷键 3)">
+      <span class="nav-icon"><svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M10 2.2L17 6.2v7.6l-7 4-7-4V6.2l7-4z"/><path d="M10 10l7-3.8M10 10v7.8M10 10L3 6.2"/></svg></span>
+      <span>空间与输入</span><kbd>3</kbd>
+    </a>
+    <a href="#timeline" class="nav-link nav-view" data-view-target="timing" title="时序与帧率诊断 (快捷键 4)">
+      <span class="nav-icon"><svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 13.5l4-4.5 3.5 3 4.5-6.5 3 3"/></svg></span>
+      <span>性能与时序</span><kbd>4</kbd>
+    </a>
+    <a href="#thermal-panel" class="nav-link nav-view" data-view-target="hardware" title="SoC 负载与热管理 (快捷键 5)">
+      <span class="nav-icon"><svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="5" y="5" width="10" height="10" rx="2"/><path d="M8 2v3M12 2v3M8 15v3M12 15v3M2 8h3M2 12h3M15 8h3M15 12h3"/></svg></span>
+      <span>硬件与热控</span><kbd>5</kbd>
+    </a>
+  </div>
+
+  <div class="rail-foot">
+    <div class="rail-device"><span class="dot" id="rail-dot"></span> <b>Qiyu MIX · A081</b></div>
+    <small id="kernel-version">SM8250 · 只读遥测</small>
+    <div class="rail-tags">
+      <span>100ms 门限</span>
+      <span>零外推</span>
+    </div>
+  </div>
+</nav>
+
+<!-- 顶部毛玻璃导航栏 -->
+<header class="topbar">
+  <div class="topbar-left">
+    <div class="brand">
+      <b>M<span>↗</span></b>
+      <div>MIX <span class="muted">/ Spatial Debug Studio</span></div>
+    </div>
+    <div class="session-badge" title="当前订阅追踪会话">
+      <span class="session-label">LIVE SESSION</span>
+      <code class="session-id" id="session">等待选择真实追踪会话</code>
+    </div>
+  </div>
+
+  <div class="header-status">
+    <span id="mode" class="pill">连接中</span>
+    <span id="connection" class="conn-text">等待数据</span>
+    <span id="ws-bound" class="pill subtle mono" title="WebSocket 传输年龄保守上界">WS — ms</span>
+    <button id="theme" type="button" class="btn-glass" title="切换明暗主题" aria-label="切换明暗主题">◐ 主题</button>
+    <button id="export" type="button" class="btn-primary">导出快照 ↗</button>
+  </div>
+</header>
+
+<main id="workspace">
+  <!-- Bento KPI 遥测矩阵：微光卡片 + 大字距等宽读数 -->
+  <section class="hud-ribbon overview-strip" aria-label="核心遥测指标带">
+    <div class="hud-cell" data-accent="emerald">
+      <div class="hud-cell-head">
+        <span class="hud-title"><span class="dot" id="hud-link-dot"></span>追踪链路</span>
+        <span class="hud-tag" id="source-name">—</span>
+      </div>
+      <div class="hud-cell-main">
+        <strong id="packet-rate">—</strong><small>pkt/s</small>
+      </div>
+      <small id="overview-status" class="hud-sub">等待设备数据</small>
+    </div>
+
+    <div class="hud-cell" data-accent="violet">
+      <div class="hud-cell-head">
+        <span class="hud-title">头显 6DoF</span>
+        <span class="hud-tag" id="head-status-mini">100ms 门限</span>
+      </div>
+      <div class="hud-cell-main">
+        <strong id="overview-pose">—</strong>
+      </div>
+      <div class="hud-progress" title="样本年龄相对于 100ms 实时门限"><div id="pose-age-bar" class="hud-progress-fill"></div></div>
+      <small id="overview-quality" class="hud-sub">等待真实数据</small>
+    </div>
+
+    <div class="hud-cell" data-accent="cyan">
+      <div class="hud-cell-head">
+        <span class="hud-title">显示扫描 / VR</span>
+        <span class="hud-tag" id="native-mode">DRM / SteamVR</span>
+      </div>
+      <div class="hud-cell-main">
+        <strong id="native-scan">—</strong>
+        <span class="hud-sep">/</span>
+        <strong id="native-fps">—</strong>
+      </div>
+      <small class="hud-sub">CRTC 物理刷新与合成器帧率</small>
+    </div>
+
+    <div class="hud-cell" data-accent="blue">
+      <div class="hud-cell-head">
+        <span class="hud-title">远程流解码</span>
+        <span class="hud-tag" id="hud-bitrate-tag">WebRTC</span>
+      </div>
+      <div class="hud-cell-main">
+        <strong id="overview-fps">—</strong><small>fps</small>
+      </div>
+      <small class="hud-sub">采集 → 编码 P50 <b id="overview-latency">—</b> ms</small>
+    </div>
+
+    <div class="hud-cell" data-accent="amber">
+      <div class="hud-cell-head">
+        <span class="hud-title">硬件时钟同步</span>
+        <span class="hud-tag">≤ 50 µs</span>
+      </div>
+      <div class="hud-cell-main">
+        <strong id="clock-bracket">—</strong><small>µs</small>
+      </div>
+      <small class="hud-sub">相机 → IMU 间隔 <b id="camera-age">—</b> ms</small>
+    </div>
+
+    <div class="hud-cell" data-accent="rose">
+      <div class="hud-cell-head">
+        <span class="hud-title" id="memory-label">SoC 负载与内存</span>
+        <span class="hud-tag" id="temperature">温度未读到</span>
+      </div>
+      <div class="hud-cell-main">
+        <strong id="gpu-load">—</strong><small>GPU</small>
+        <span class="hud-sep">·</span>
+        <strong id="memory">—</strong>
+      </div>
+      <small class="hud-sub">VPU 帧预算 P95 <b id="vpu-budget">—</b></small>
+    </div>
+  </section>
+
+  <!-- 核心 Bento 工作区：左栏视觉与传感器矩阵，右栏 3D 视口、手柄与 IMU -->
+  <div class="workspace">
+    <!-- 左栏：视觉监测工作台 -->
+    <div class="visual-column" data-zone="visual">
+      <section class="panel preview-panel" id="video-panel">
+        <div class="panel-head">
+          <div class="panel-title-group">
+            <h2><span class="dot amber" id="video-dot"></span> 实时头显画面</h2>
+            <span id="preview-source" class="pill subtle">WebRTC · 尚未观看</span>
+          </div>
+          <div class="panel-actions">
+            <select id="preview-transport" aria-label="预览传输">
+              <option value="webrtc" selected>WebRTC 硬件编码</option>
+              <option value="jpeg">JPEG 维护回退</option>
+            </select>
+            <button id="pause" type="button" class="btn-primary" hidden>开始 JPEG 预览</button>
+          </div>
+        </div>
+
+        <div id="video-control-notice" class="video-control-notice" hidden>
+          <div><strong id="video-control-title">全部视频已手动关闭</strong><p id="video-control-description">先恢复视频启动权限，再选择要观看的视频。恢复视频不会启动追踪。</p></div>
+          <button type="button" id="video-resume-screen" class="btn-primary">恢复视频启动权限</button>
+        </div>
+        <div id="video-wrap" class="video-stage-wrap">
+          <iframe id="video-frame" src="/video/" title="MIX WebRTC 实时画面" allow="autoplay; fullscreen" referrerpolicy="no-referrer"></iframe>
+          <div id="video-standby" class="video-standby" hidden>
+            <div class="standby-card">
+              <div class="standby-glow"></div>
+              <span class="standby-icon">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="5" width="20" height="14" rx="4"/><circle cx="8.5" cy="12" r="2.5"/><circle cx="15.5" cy="12" r="2.5"/></svg>
+              </span>
+              <strong id="video-standby-title">实时 WebRTC 视频流未开启</strong>
+              <p id="video-standby-desc">当前处于离线或回放模式，独立 8091 视频服务未连接。可切换至 JPEG 维护回退查看静态或历史画面。</p>
+              <button type="button" id="standby-switch-jpeg" class="btn-glass">切换到 JPEG / 历史画面</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="jpeg-panel" hidden>
+          <div class="preview-options">
+            <label>传输宽度
+              <select id="width">
+                <option value="640">640 · 轻量</option>
+                <option value="960" selected>960 · 平衡</option>
+                <option value="1280">1280 · 清晰</option>
+                <option value="1920">1920 · 精细</option>
+              </select>
+            </label>
+            <label>目标帧率
+              <select id="fps"><option>2</option><option selected>5</option><option>10</option><option>15</option></select>
+            </label>
+            <label>JPEG 质量
+              <select id="quality-select"><option value="45">45</option><option value="65" selected>65</option><option value="85">85</option></select>
+            </label>
+            <label>查看缩放
+              <select id="zoom"><option value="fit">适应区域</option><option value="1">100%</option><option value="2">200%</option></select>
+            </label>
+            <button id="apply" type="button" class="btn-glass">应用采集设置</button>
+          </div>
+          <div class="preview-wrap" id="preview-wrap">
+            <img id="preview" alt="真实双眼或桌面画面预览" hidden>
+            <div id="preview-empty">
+              <span>▧</span>
+              <strong>等待画面</strong>
+              <p>预览按需采集，暂停后 5 秒自动释放采集进程</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="scene-footer">
+          <span id="preview-metrics">H.264 / H.265 / WebRTC · 实际帧率见视频统计</span>
+          <span id="preview-message">点击开始观看；JPEG 默认关闭</span>
+        </div>
+      </section>
+
+      <section class="panel phase-video-panel" id="phase-video-panel">
+        <div class="panel-head"><h2>三相视频 · H.264 / WebRTC</h2><button type="button" id="phase-export">导出观测数据</button></div>
+        <div class="phase-actions">
+          <button type="button" id="video-off">彻底关闭全部视频</button>
+          <button type="button" id="video-resume">恢复视频启动权限</button>
+          <button type="button" id="screen-stop">关闭屏幕流</button>
+          <label>编码器并发上限 <select id="encoder-limit"><option>1</option><option>2</option><option>3</option><option selected>4</option></select></label>
+        </div>
+        <p id="encoder-state" role="status">正在读取编码器占用</p>
+        <p class="camera-note">三路独立视频，每路为同相位四相机拼图。停止释放本路编码器；全部关闭会锁住自动重开。恢复后仍需手动启动。并发配额不代表硬件容量已实测。</p>
+        <div id="phase-video-grid" class="phase-video-grid"></div>
+        <p class="camera-note">延迟分开记录设备编码、浏览器解码与视频帧回调。DQ→回调是时钟区间估计，不是屏幕实际出光延迟。短相不等同左右手。</p>
+      </section>
+
+      <!-- 传感器相机矩阵 -->
+      <section class="panel camera-panel" id="camera-panel">
+        <div class="panel-head">
+          <div class="panel-title-group">
+            <h2><span class="dot" id="camera-dot"></span> 相机三相 · 按用途预览</h2>
+            <span id="camera-summary" class="pill subtle">尚未观看</span>
+          </div>
+          <div class="camera-toolbar">
+            <div class="seg-group" role="group" aria-label="相机通道过滤">
+              <button type="button" class="seg-btn active" data-cam-filter="all">全部用途</button>
+              <button type="button" class="seg-btn" data-cam-filter="slam">SLAM 长曝光</button>
+              <button type="button" class="seg-btn" data-cam-filter="controller">手柄双短相</button>
+              <button type="button" class="seg-btn" data-cam-filter="unclassified">用途未确认</button>
+              <button type="button" class="seg-btn" data-cam-filter="imx">2 路透视</button>
+              <button type="button" class="seg-btn" data-cam-filter="live">仅活跃</button>
+            </div>
+            <button type="button" id="camera-crosshair" class="btn-ghost" aria-pressed="false" title="叠加光学中心十字线">┼ 准星</button>
+            <button type="button" id="camera-toggle" class="btn-primary" aria-pressed="false">原始像素诊断预览</button>
+          </div>
+        </div>
+        <p class="camera-note" id="camera-note">同一组 OV7251 按短／短／长曝光分为三相用途流，只有逐帧元数据有效时才分类；旧源和无效相位放入“用途未确认”。未开流时等待，500ms 超时清空。</p>
+        <div id="camera-grid" class="camera-grid" data-filter="all"></div>
+        <div class="scene-footer">
+          <span>Rust 原始像素通路 · 每相机每相最高 30 fps · 实时统计到达帧率与平均亮度 (Y)</span>
+          <span>保留传感器方向 · IMX471 为 pRAA 简易提取，未经 ISP 校色</span>
+        </div>
+      </section>
+    </div>
+
+    <!-- 右栏：3D 追踪空间、6DoF 检视器、双手柄与 IMU -->
+    <div class="spatial-column" data-zone="spatial">
+      <section class="panel scene-panel" id="tracking-panel">
+        <div class="panel-head">
+          <div class="panel-title-group">
+            <h2><span class="dot"></span> 三维追踪空间</h2>
+            <span id="pose-state" class="pill">未接入姿态</span>
+          </div>
+          <div class="toolbar seg-group">
+            <button id="orbit" type="button" class="seg-btn active">透视</button>
+            <button id="front" type="button" class="seg-btn">正视</button>
+            <button id="top" type="button" class="seg-btn">俯视</button>
+            <button id="side" type="button" class="seg-btn">侧视</button>
+            <button id="scene-fit" type="button" class="seg-btn">全部居中</button>
+            <button id="reset" type="button" class="seg-btn" title="重置相机视角并清空历史轨迹">重置</button>
+          </div>
+        </div>
+
+        <div class="scene-wrap">
+          <canvas id="scene" role="img" aria-label="统一追踪空间：头显、左右手柄与运动轨迹；拖动旋转，滚轮缩放"></canvas>
+          <div class="scene-top">
+            <span id="coordinate" class="scene-tag">共同追踪原点 · 米</span>
+            <span id="euler-hud" class="scene-tag mono">R —° · P —° · Y —°</span>
+          </div>
+          <div class="scene-bottom">
+            <span>拖动旋转 · 滚轮缩放 · 空间高度投影</span>
+            <span class="axis-pills"><b class="red">X 右</b> <b class="green">Y 上</b> <b class="blue">−Z 前</b></span>
+          </div>
+        </div>
+
+        <div class="scene-tools" aria-label="运动轨迹设置">
+          <span class="muted">轨迹</span>
+          <label class="scene-key head-key"><input id="trail-head" type="checkbox" checked>头显</label>
+          <label class="scene-key left-key"><input id="trail-left" type="checkbox" checked>左手</label>
+          <label class="scene-key right-key"><input id="trail-right" type="checkbox" checked>右手</label>
+          <select id="trail-duration" aria-label="轨迹保留时间"><option value="10">最近 10 秒</option><option value="30" selected>最近 30 秒</option><option value="60">最近 60 秒</option></select>
+          <button id="trail-clear" type="button" class="seg-btn">清除轨迹</button>
+        </div>
+        <div class="scene-devices" aria-label="空间内设备状态">
+          <div class="scene-device head-key"><strong>HMD · 头显</strong><span id="scene-head-state">等待姿态</span><span id="scene-head-position" class="mono">XYZ —</span><small id="scene-head-detail">轨迹 0 点</small></div>
+          <div class="scene-device left-key"><strong>L · 左手</strong><span id="scene-left-state">等待姿态</span><span id="scene-left-position" class="mono">XYZ —</span><small id="scene-left-detail">轨迹 0 点</small></div>
+          <div class="scene-device right-key"><strong>R · 右手</strong><span id="scene-right-state">等待姿态</span><span id="scene-right-position" class="mono">XYZ —</span><small id="scene-right-detail">轨迹 0 点</small></div>
+        </div>
+
+        <div class="hmd-inspector">
+          <div class="device-title">
+            <span class="device-icon">HMD</span>
+            <div>
+              <h3>头显 6DoF 实时遥测 <small>Qiyu MIX A081 · QVR v1</small></h3>
+            </div>
+            <span id="head-status" class="badge">未知</span>
+          </div>
+          <dl class="telemetry-grid">
+            <div><dt>位置 XYZ (m)</dt><dd id="position">—</dd></div>
+            <div><dt>四元数 XYZW</dt><dd id="rotation">—</dd></div>
+            <div><dt>欧拉角 RPY (°)</dt><dd id="euler-angles">—</dd></div>
+            <div><dt>质量 / 状态 / 年龄</dt><dd><span id="quality">—</span> · <span id="age">—</span></dd></div>
+          </dl>
+          <p id="head-reason" class="reason">等待真实数据</p>
+        </div>
+
+        <div class="scene-footer">
+          <span>网格 0.25 m · 参考平面非实测地面</span>
+          <span>实线：光学更新 · 虚线：原厂预测 · 失效处断开轨迹</span>
+          <span>头显失效最多灰显保持 500 ms；手柄失效隐藏。模型为姿态示意，握持方向未标定。</span>
+        </div>
+      </section>
+
+      <!-- 双手柄可视化检视面板 -->
+      <aside class="panel devices" aria-label="双手柄状态检视">
+        <div class="panel-head">
+          <div class="panel-title-group">
+            <h2>双手柄定位与输入</h2>
+            <span class="muted">实时定位 ≤100ms · SDK 状态 ≤1500ms</span>
+          </div>
+        </div>
+        <div class="controllers-grid">
+          <article class="device controller-card">
+            <div class="device-title">
+              <span class="device-icon left">L</span>
+              <div><h3>左手柄 <small>Hand 0 · SDK / Nordic72</small></h3></div>
+              <span id="left-status" class="badge">未观测</span>
+            </div>
+            <div class="controller-body">
+              <div class="stick-pad" title="左手柄摇杆原始 XY 位置示意">
+                <div class="stick-ring"></div>
+                <div class="stick-cross-h"></div>
+                <div class="stick-cross-v"></div>
+                <div id="left-stick-dot" class="stick-dot"></div>
+              </div>
+              <dl class="controller-dl">
+                <dt>SDK 服务</dt><dd id="left-worker">未启动</dd>
+                <dt>Link / Enable</dt><dd id="left-link">—</dd>
+                <dt>状态 / 时钟</dt><dd id="left-state">—</dd>
+                <dt>电源 / 无线</dt><dd id="left-power">—</dd>
+                <dt>无线数据</dt><dd id="left-radio">—</dd>
+                <dt>姿态 / 位置</dt><dd id="left-validity">无效 / 无效</dd>
+                <dt>位置 XYZ (m)</dt><dd id="left-position">—</dd>
+                <dt>旋转 XYZW</dt><dd id="left-orientation">—</dd>
+                <dt>置信度 / 时效</dt><dd id="left-confidence">—</dd>
+                <dt>按键 / 触摸</dt><dd id="left-buttons">—</dd>
+                <dt>摇杆 XY</dt><dd id="left-stick">—</dd>
+                <dt>食指 / 中指</dt><dd id="left-fingers">未提供</dd>
+                <dt>电量</dt><dd id="left-battery">未提供</dd>
+              </dl>
+            </div>
+            <div class="bitmask-strip" id="left-mask-pills">
+              <span class="mask-pill" data-bit="1">BTN 按键</span>
+              <span class="mask-pill" data-bit="2">TCH 触摸</span>
+              <span class="mask-pill" data-bit="16">STK 摇杆</span>
+            </div>
+            <p class="reason" id="left-reason">等待当前会话</p><details><summary>SDK 最近原始记录（可含休眠缓存）</summary><pre id="left-sdk-raw">未提供</pre></details>
+          </article>
+
+          <article class="device controller-card">
+            <div class="device-title">
+              <span class="device-icon right">R</span>
+              <div><h3>右手柄 <small>Hand 1 · SDK / Nordic72</small></h3></div>
+              <span id="right-status" class="badge">未观测</span>
+            </div>
+            <div class="controller-body">
+              <div class="stick-pad" title="右手柄摇杆原始 XY 位置示意">
+                <div class="stick-ring"></div>
+                <div class="stick-cross-h"></div>
+                <div class="stick-cross-v"></div>
+                <div id="right-stick-dot" class="stick-dot"></div>
+              </div>
+              <dl class="controller-dl">
+                <dt>SDK 服务</dt><dd id="right-worker">未启动</dd>
+                <dt>Link / Enable</dt><dd id="right-link">—</dd>
+                <dt>状态 / 时钟</dt><dd id="right-state">—</dd>
+                <dt>电源 / 无线</dt><dd id="right-power">—</dd>
+                <dt>无线数据</dt><dd id="right-radio">—</dd>
+                <dt>姿态 / 位置</dt><dd id="right-validity">无效 / 无效</dd>
+                <dt>位置 XYZ (m)</dt><dd id="right-position">—</dd>
+                <dt>旋转 XYZW</dt><dd id="right-orientation">—</dd>
+                <dt>置信度 / 时效</dt><dd id="right-confidence">—</dd>
+                <dt>按键 / 触摸</dt><dd id="right-buttons">—</dd>
+                <dt>摇杆 XY</dt><dd id="right-stick">—</dd>
+                <dt>食指 / 中指</dt><dd id="right-fingers">未提供</dd>
+                <dt>电量</dt><dd id="right-battery">未提供</dd>
+              </dl>
+            </div>
+            <div class="bitmask-strip" id="right-mask-pills">
+              <span class="mask-pill" data-bit="1">BTN 按键</span>
+              <span class="mask-pill" data-bit="2">TCH 触摸</span>
+              <span class="mask-pill" data-bit="16">STK 摇杆</span>
+            </div>
+            <p class="reason" id="right-reason">等待当前会话</p><details><summary>SDK 最近原始记录（可含休眠缓存）</summary><pre id="right-sdk-raw">未提供</pre></details>
+          </article>
+        </div>
+      </aside>
+
+      <!-- 惯性测量 (IMU) 实时示波器 -->
+      <section class="panel signals" id="imu-panel">
+        <div class="panel-head">
+          <div class="panel-title-group">
+            <h2>惯导传感器示波 (IMU)</h2>
+            <span class="muted">陀螺仪 rad/s</span>
+          </div>
+          <span class="mono-readout" id="gyro">—</span>
+        </div>
+        <div class="imu-chart-wrap">
+          <div class="signal-label">
+            <span>角速度实时波形 XYZ</span>
+            <span id="chart-legend" class="inline-legend"></span>
+          </div>
+          <canvas id="chart" aria-label="陀螺仪实时曲线"></canvas>
+        </div>
+        <dl class="imu-dl">
+          <div><dt>加速度 XYZ (m/s²)</dt><dd id="accel">—</dd></div>
+          <div><dt>Warning 标志</dt><dd id="warning">—</dd></div>
+          <div><dt>QVR 采样序号</dt><dd id="sequence">—</dd></div>
+        </dl>
+        <p class="reason">数据过期立即失效；回放带固定历史标识，不用于实机验收。</p>
+      </section>
+    </div>
+  </div>
+
+  <!-- 性能诊断、硬件负载与时序分析工作台 -->
+  <section id="timeline" class="timeline-section" data-zone="timing">
+    <div class="timeline-topbar">
+      <div class="timeline-title-block">
+        <div class="eyebrow">PERFORMANCE &amp; TIMELINE ANALYZER</div>
+        <h2>管线瓶颈与同步时序台</h2>
+        <p id="chart-status">从连接时开始记录 · 悬停任一图表可跨图同步时间游标 · 未提供或过期数据留空</p>
+      </div>
+
+      <div class="timeline-controls">
+        <div class="seg-group" role="group" aria-label="图表分类筛选">
+          <button type="button" class="seg-btn active" data-chart-cat="all">全部 (16)</button>
+          <button type="button" class="seg-btn" data-chart-cat="display">显示与合成 (3)</button>
+          <button type="button" class="seg-btn" data-chart-cat="video">编码与流媒体 (7)</button>
+          <button type="button" class="seg-btn" data-chart-cat="tracking">追踪与传感器 (4)</button>
+          <button type="button" class="seg-btn" data-chart-cat="thermal">温度与频率 (2)</button>
+        </div>
+
+        <div class="seg-group" role="group" aria-label="图表列数">
+          <button type="button" class="seg-btn active" data-chart-cols="smart" title="主次分层 (4核心大图 + 12专项紧凑图)">智能分层</button>
+          <button type="button" class="seg-btn" data-chart-cols="3" title="紧凑 3 列">3列</button>
+          <button type="button" class="seg-btn" data-chart-cols="2" title="标准 2 列">2列</button>
+          <button type="button" class="seg-btn" data-chart-cols="1" title="宽幅 1 列">1列</button>
+        </div>
+
+        <label class="window-select">时间窗
+          <select id="history-window">
+            <option value="20">20 秒</option>
+            <option value="60" selected>60 秒</option>
+            <option value="120">120 秒</option>
+          </select>
+        </label>
+        <button id="charts-pause" type="button" class="btn-glass" aria-pressed="false">暂停图表</button>
+        <button id="charts-clear" type="button" class="btn-glass">清空</button>
+        <button id="charts-export" type="button" class="btn-primary">导出时序 ↓</button>
+      </div>
+    </div>
+
+    <!-- 管线阶段耗时瀑布图 + 瓶颈诊断摘要 + SoC 实时频率热控面板 -->
+    <div class="diagnosis-row">
+      <section class="panel stage-panel">
+        <div class="panel-head">
+          <h2>视频处理阶段分解 (P50)</h2>
+          <span class="muted">最近 300 样本 · 对比 16.7ms 预算</span>
+        </div>
+        <div id="stage-bars">
+          <div class="stage-empty">等待视频会话启动后采集各阶段耗时…</div>
+        </div>
+        <p class="reason">各阶段分位数独立统计，不直接相加为端到端总延迟。</p>
+      </section>
+
+      <section class="panel insights">
+        <div class="panel-head">
+          <h2>瓶颈诊断与流统计</h2>
+          <span class="pill" id="analysis-state">等待视频</span>
+        </div>
+        <p id="bottleneck-summary">开始观看后，自动对比采集尝试、内容变化、硬件编码与浏览器解码帧率。</p>
+        <div class="mini-stats">
+          <div><span>重复画面跳过比</span><strong id="duplicate-ratio">—</strong></div>
+          <div><span>已确认队列丢帧</span><strong id="queue-drops">—</strong></div>
+          <div><span>实际接收码率</span><strong id="actual-bitrate">—</strong></div>
+        </div>
+      </section>
+
+      <section class="panel soc-live-panel" data-zone="hardware">
+        <div class="panel-head">
+          <h2>SoC 频率与热控实时表</h2>
+          <span class="pill subtle" id="soc-cooling-badge">温控正常</span>
+        </div>
+        <div id="soc-live-bars" class="soc-bars-grid">
+          <div class="stage-empty">等待设备频率与温度采样…</div>
+        </div>
+        <p class="reason" id="load-scope">GPU 按 DRM client 去重统计任务时长；VPU 硬件忙碌率未暴露，仅展示工作时钟与编码占时。</p>
+      </section>
+    </div>
+
+    <!-- 16 张同步时序图矩阵：4 张核心主图双列置顶 + 12 张专项通道四列紧凑排布 -->
+    <div class="chart-grid" id="chart-grid" data-cols="smart" data-filter="all">
+      <section class="panel chart-panel chart-hero" data-cat="video">
+        <div class="panel-head"><div><h3><span class="hero-badge">CORE</span> 帧率分布</h3><p>采集尝试 / 内容变化 / 编码 / 解码 / 呈现</p></div><span class="unit">fps</span></div>
+        <canvas id="frame-rates" tabindex="0" role="img" aria-label="帧率分布时序图"></canvas>
+        <div id="frame-rates-legend" class="chart-legend"></div>
+      </section>
+
+      <section class="panel chart-panel chart-hero" data-cat="video">
+        <div class="panel-head"><div><h3><span class="hero-badge">CORE</span> 处理阶段耗时</h3><p>采集 / 管道传输 / 编码 / 采集至编码输出</p></div><span class="unit">ms · P50</span></div>
+        <canvas id="pipeline-latency" tabindex="0" role="img" aria-label="处理阶段耗时时序图"></canvas>
+        <div id="pipeline-latency-legend" class="chart-legend"></div>
+      </section>
+
+      <section class="panel chart-panel chart-hero" data-cat="display">
+        <div class="panel-head"><div><h3><span class="hero-badge">CORE</span> 设备原生帧率</h3><p>显示扫描 / SteamVR 帧索引 / 应用提交</p></div><span class="unit">Hz / fps</span></div>
+        <canvas id="native-frame-rates" role="img" aria-label="设备原生帧率时序图"></canvas>
+        <div id="native-frame-rates-legend" class="chart-legend"></div>
+      </section>
+
+      <section class="panel chart-panel chart-hero" data-cat="tracking">
+        <div class="panel-head"><div><h3><span class="hero-badge">CORE</span> 姿态数据时效</h3><p>样本年龄 / 相机间隔 / WS 传输年龄上界</p></div><span class="unit">ms</span></div>
+        <canvas id="pose-age" tabindex="0" role="img" aria-label="姿态数据时效时序图"></canvas>
+        <div id="pose-age-legend" class="chart-legend"></div>
+      </section>
+
+      <section class="panel chart-panel" data-cat="display">
+        <div class="panel-head"><div><h3>SteamVR 帧耗时</h3><p>合成 GPU / 合成 CPU / Present 调用 / 等待 Present</p></div><span class="unit">ms</span></div>
+        <canvas id="compositor-timing" role="img" aria-label="SteamVR 帧耗时时序图"></canvas>
+        <div id="compositor-timing-legend" class="chart-legend"></div>
+      </section>
+
+      <section class="panel chart-panel" data-cat="display" data-zone="hardware">
+        <div class="panel-head"><div><h3>GPU / CPU 负载</h3><p>GPU 总任务占时 / SteamVR / 采集 / CPU / PSI 等待压力</p></div><span class="unit">%</span></div>
+        <canvas id="gpu-load-history" role="img" aria-label="GPU / CPU 负载时序图"></canvas>
+        <div id="gpu-load-history-legend" class="chart-legend"></div>
+      </section>
+
+      <section class="panel chart-panel" data-cat="video">
+        <div class="panel-head"><div><h3>接收与解码时序</h3><p>ICE 往返 / 抖动缓冲 / 解码耗时</p></div><span class="unit">ms</span></div>
+        <canvas id="network-latency" tabindex="0" role="img" aria-label="接收与解码时序时序图"></canvas>
+        <div id="network-latency-legend" class="chart-legend"></div>
+      </section>
+
+      <section class="panel chart-panel" data-cat="video">
+        <div class="panel-head"><div><h3>视频回调间隔</h3><p>P50 / P95 / 最大间隔</p></div><span class="unit">ms</span></div>
+        <canvas id="frame-intervals" tabindex="0" role="img" aria-label="视频回调间隔时序图"></canvas>
+        <div id="frame-intervals-legend" class="chart-legend"></div>
+      </section>
+
+      <section class="panel chart-panel" data-cat="video">
+        <div class="panel-head"><div><h3>VPU 编码压力</h3><p>编码 P50 / P95 占请求帧预算比例 · 非硬件忙碌率</p></div><span class="unit">%</span></div>
+        <canvas id="vpu-pressure" role="img" aria-label="VPU 编码压力时序图"></canvas>
+        <div id="vpu-pressure-legend" class="chart-legend"></div>
+      </section>
+
+      <section class="panel chart-panel" data-cat="video">
+        <div class="panel-head"><div><h3>编码队列与吞吐</h3><p>排队缓冲 / 待匹配编码输出 / 编码吞吐</p></div><span class="unit">帧 / fps</span></div>
+        <canvas id="encoder-queue" role="img" aria-label="编码队列与吞吐时序图"></canvas>
+        <div id="encoder-queue-legend" class="chart-legend"></div>
+      </section>
+
+      <section class="panel chart-panel" data-cat="video" data-zone="hardware">
+        <div class="panel-head"><div><h3>VPU 工作时钟</h3><p>MVS0 / MVS1 分频时钟；关闭时钟显示 0</p></div><span class="unit">MHz</span></div>
+        <canvas id="vpu-clocks" role="img" aria-label="VPU 工作时钟时序图"></canvas>
+        <div id="vpu-clocks-legend" class="chart-legend"></div>
+      </section>
+
+      <section class="panel chart-panel" data-cat="tracking">
+        <div class="panel-head"><div><h3>时钟与有效性</h3><p>IPC 时钟夹区间 / 50 µs 门限</p></div><span class="unit">µs</span></div>
+        <canvas id="clock-timing" tabindex="0" role="img" aria-label="时钟与有效性时序图"></canvas>
+        <div id="clock-timing-legend" class="chart-legend"></div>
+      </section>
+
+      <section class="panel chart-panel" data-cat="tracking">
+        <div class="panel-head"><div><h3>位置变化</h3><p>X / Y / Z · 原点与物理精度未校准</p></div><span class="unit">m</span></div>
+        <canvas id="position-history" tabindex="0" role="img" aria-label="位置变化时序图"></canvas>
+        <div id="position-history-legend" class="chart-legend"></div>
+      </section>
+
+      <section class="panel chart-panel" data-cat="tracking">
+        <div class="panel-head"><div><h3>加速度</h3><p>X / Y / Z</p></div><span class="unit">m/s²</span></div>
+        <canvas id="accel-history" tabindex="0" role="img" aria-label="加速度时序图"></canvas>
+        <div id="accel-history-legend" class="chart-legend"></div>
+      </section>
+
+      <section class="panel chart-panel" id="thermal-panel" data-cat="thermal" data-zone="hardware">
+        <div class="panel-head"><div><h3>设备温度</h3><p>CPU 最高 / GPU 最高 / 外壳最高</p></div><span class="unit">°C</span></div>
+        <canvas id="temperature-history" tabindex="0" role="img" aria-label="设备温度时序图"></canvas>
+        <div id="temperature-history-legend" class="chart-legend"></div>
+      </section>
+
+      <section class="panel chart-panel" data-cat="thermal" data-zone="hardware">
+        <div class="panel-head"><div><h3>处理器频率</h3><p>小核 / 大核 / 超大核 / GPU</p></div><span class="unit">MHz</span></div>
+        <canvas id="frequency-history" tabindex="0" role="img" aria-label="处理器频率时序图"></canvas>
+        <div id="frequency-history-legend" class="chart-legend"></div>
+      </section>
+    </div>
+
+    <section class="panel event-panel" data-zone="hardware">
+      <div class="panel-head">
+        <h2>状态事件流</h2>
+        <span class="muted">连接、会话切换、有效性与视频状态变更记录</span>
+      </div>
+      <ol id="event-list"><li class="empty-event">等待事件</li></ol>
+    </section>
+  </section>
+
+  <footer>
+    <span>MIX STUDIO · SPATIAL DIAGNOSTIC WORKBENCH</span>
+    <span id="footer-state">等待连接</span>
+  </footer>
+</main>
+
+<script src="dashboard.js"></script>
+<script src="app.js"></script>
+<script src="cameras.js"></script>
+<script src="phase-video.js"></script>
+</body>
+</html>

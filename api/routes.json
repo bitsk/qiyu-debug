@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "kind": "source-derived route inventory; not a new runtime protocol version",
+  "routes": [
+    "/api/cameras",
+    "/api/cameras/frames",
+    "/api/cameras/webrtc",
+    "/api/preview",
+    "/api/session",
+    "/api/session/{}",
+    "/api/state",
+    "/api/stop",
+    "/api/video-control",
+    "/video/",
+    "/ws/state"
+  ]
+}
