@@ -16,3 +16,5 @@
 `python3 tools/build.py --sysroot /path/to/arm64/gstreamer/sysroot --output /new/build`
 
 生成的 debug/ 包把前端与服务放在一起，适配后端既有资源加载规则。离线验证使用 `mix-debug-server --offline --listen 127.0.0.1 --token-file /private/generated/token`；密钥按现有方式在本地生成，不进入 Git。摄像头来自生产者 tap；当前硬件编码、采集/解码/呈现统计边界保留。
+
+相机/VR 时序观测 helper 可单独构建：`python3 tools/build_helpers.py --openvr-include /path/to/openvr/headers --output /new/helpers`，消费相邻 device-service 的采集 tap 头文件。`video/` 保留其原生编码/转换源码与历史配方，尚未统一成同一个便携构建入口。

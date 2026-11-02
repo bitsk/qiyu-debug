@@ -2,7 +2,7 @@
 // Bounded IMX471 observer for an ALREADY CONFIGURED pair. The device executor
 // verifies slot4=PHY1 and slot5=PHY0 before invoking it. Never changes the graph,
 // exposure, GPIOs or the tracking service. Shares the capture ownership lock.
-#include "camera-preview.hpp"
+#include <qiyu/device/camera-preview.hpp>
 #include <cerrno>
 #include <atomic>
 #include <csignal>
