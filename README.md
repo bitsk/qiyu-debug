@@ -2,7 +2,6 @@
 
 同仓的调试前端、Rust 后端与视频 helpers。
 
-实际功能源码首次按仓库所有权整理，来源和导入前后 SHA-256 见 `provenance/source-import.json`。原有历史构建与设备结果不自动等同于拆分后的设备验收。
 
 构建入口和依赖见下方；工程 Wiki/Blog 与跨仓库规划集中在 [qiyu-docs](https://github.com/bitsk/qiyu-docs)。
 
